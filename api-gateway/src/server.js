@@ -19,6 +19,8 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
+const paymentRoutes = require('./routes/payments');
+const cartRoutes = require('./routes/carts');
 const healthRoutes = require('./routes/health');
 
 const app = express();
@@ -77,6 +79,12 @@ app.use('/api/products', productRoutes);
 // Order routes (ORDER SERVICE)
 app.use('/api/orders', orderRoutes);
 
+// Payment routes (PAYMENT SERVICE)
+app.use('/api/payments', paymentRoutes);
+
+// Cart routes (CART SERVICE)
+app.use('/api/carts', cartRoutes);
+
 // ===== ERROR HANDLING =====
 
 // 404 - Route not found
@@ -114,6 +122,8 @@ const startServer = () => {
     console.log(`   User Service: ${process.env.USER_SERVICE_URL}`);
     console.log(`   Product Service: ${process.env.PRODUCT_SERVICE_URL}`);
     console.log(`   Order Service: ${process.env.ORDER_SERVICE_URL}`);
+    console.log(`   Payment Service: ${process.env.PAYMENT_SERVICE_URL}`);
+    console.log(`   Cart Service: ${process.env.CART_SERVICE_URL}`);
     console.log(`\n⚙️  Configuration:`);
     console.log(`   CORS Origin: ${process.env.CORS_ORIGIN || 'All origins (*)'}`);
     console.log(`   JWT Secret: ${process.env.JWT_SECRET ? '✓ Set' : '✗ Not set'}`);

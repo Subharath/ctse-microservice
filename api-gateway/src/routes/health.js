@@ -33,6 +33,18 @@ router.get('/', async (req, res) => {
         status: 'unknown',
         responseTime: null,
         error: null
+      },
+      paymentService: {
+        url: process.env.PAYMENT_SERVICE_URL,
+        status: 'unknown',
+        responseTime: null,
+        error: null
+      },
+      cartService: {
+        url: process.env.CART_SERVICE_URL,
+        status: 'unknown',
+        responseTime: null,
+        error: null
       }
     };
 
