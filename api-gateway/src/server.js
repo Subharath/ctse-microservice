@@ -10,6 +10,7 @@ const morgan = require('morgan');
 require('dotenv').config();
 
 const authMiddleware = require('./middleware/auth');
+const contextInjector = require('./middleware/contextInjector');
 const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
 const rateLimiter = require('./middleware/rateLimiter');
@@ -67,6 +68,10 @@ app.use('/api/auth', authRoutes);
 // ===== MIDDLEWARE - AUTHENTICATION =====
 // All routes below require JWT token
 app.use(authMiddleware);
+
+// ===== MIDDLEWARE - CONTEXT INJECTION =====
+// Inject user context as headers for downstream services (no re-validation needed)
+app.use(contextInjector);
 
 // ===== ROUTES - AUTHENTICATED =====
 
