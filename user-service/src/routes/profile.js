@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const { getUserId, getContext, hasRole } = require('../utils/context');
 
 /**
  * GET /profile/:userId
@@ -16,17 +17,23 @@ const logger = require('../utils/logger');
 router.get('/:userId', async (req, res, next) => {
   try {
     const { userId } = req.params;
+    const context = getContext(req);
 
-    // TODO: Implement profile fetch
-    // - Get user from MongoDB
-    // - Return user profile (exclude password)
+    // Verify user can access this profile (own profile or admin)
+    if (context.userId !== userId && !hasRole(req, 'admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this profile',
+        code: 'FORBIDDEN'
+      });
+    }
 
-    logger.debug('Profile requested', { userId });
+    logger.debug('Profile requested', { userId, requestId: context.requestId });
 
     res.json({
       success: true,
       data: {
-        // TODO: Return user profile
+        // TODO: Return user profile from MongoDB
       }
     });
 
@@ -43,19 +50,24 @@ router.put('/:userId', async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { name, email, phone, address } = req.body;
+    const context = getContext(req);
 
-    // TODO: Implement profile update
-    // - Validate input
-    // - Update user in MongoDB
-    // - Return updated profile
+    // Verify user can update this profile (own profile or admin)
+    if (context.userId !== userId && !hasRole(req, 'admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this profile',
+        code: 'FORBIDDEN'
+      });
+    }
 
-    logger.info('Profile updated', { userId });
+    logger.info('Profile update requested', { userId, requestId: context.requestId });
 
     res.json({
       success: true,
       message: 'Profile updated successfully',
       data: {
-        // TODO: Return updated profile
+        // TODO: Return updated profile from MongoDB
       }
     });
 

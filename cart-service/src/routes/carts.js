@@ -11,6 +11,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const logger = require('../utils/logger');
+const { getContext } = require('../utils/context');
 
 const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
 
@@ -34,9 +35,18 @@ const callProductService = async (method, path) => {
 router.get('/:userId', async (req, res, next) => {
   try {
     const { userId } = req.params;
+    const context = getContext(req);
 
-    // TODO: Fetch cart from MongoDB by userId
-    logger.debug('Cart requested', { userId });
+    // Verify user can access their own cart (or is admin)
+    if (context.userId !== userId && context.userRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this cart',
+        code: 'FORBIDDEN'
+      });
+    }
+
+    logger.debug('Cart requested', { userId, requestId: context.requestId });
 
     res.json({
       success: true,
@@ -56,6 +66,16 @@ router.post('/:userId/items', async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { productId, quantity = 1 } = req.body;
+    const context = getContext(req);
+
+    // Verify user can modify their own cart
+    if (context.userId !== userId && context.userRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this cart',
+        code: 'FORBIDDEN'
+      });
+    }
 
     if (!productId) {
       return res.status(400).json({
@@ -65,14 +85,13 @@ router.post('/:userId/items', async (req, res, next) => {
       });
     }
 
-    // Validate product availability before adding to cart.
+    // Validate product availability before adding to cart
     const availability = await callProductService('GET', `/products/${productId}/availability`);
     if (!availability.success) {
       return res.status(503).json(availability.data);
     }
 
-    // TODO: Persist item in MongoDB cart document.
-    logger.info('Cart item add requested', { userId, productId, quantity });
+    logger.info('Cart item add requested', { userId, productId, quantity, requestId: context.requestId });
 
     res.status(201).json({
       success: true,
@@ -92,6 +111,16 @@ router.put('/:userId/items/:productId', async (req, res, next) => {
   try {
     const { userId, productId } = req.params;
     const { quantity } = req.body;
+    const context = getContext(req);
+
+    // Verify user can modify their own cart
+    if (context.userId !== userId && context.userRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this cart',
+        code: 'FORBIDDEN'
+      });
+    }
 
     if (!quantity || quantity < 1) {
       return res.status(400).json({
@@ -101,8 +130,7 @@ router.put('/:userId/items/:productId', async (req, res, next) => {
       });
     }
 
-    // TODO: Update cart item quantity in MongoDB.
-    logger.info('Cart item update requested', { userId, productId, quantity });
+    logger.info('Cart item update requested', { userId, productId, quantity, requestId: context.requestId });
 
     res.json({
       success: true,
@@ -121,9 +149,18 @@ router.put('/:userId/items/:productId', async (req, res, next) => {
 router.delete('/:userId/items/:productId', async (req, res, next) => {
   try {
     const { userId, productId } = req.params;
+    const context = getContext(req);
 
-    // TODO: Remove item from MongoDB cart.
-    logger.info('Cart item remove requested', { userId, productId });
+    // Verify user can modify their own cart
+    if (context.userId !== userId && context.userRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this cart',
+        code: 'FORBIDDEN'
+      });
+    }
+
+    logger.info('Cart item remove requested', { userId, productId, requestId: context.requestId });
 
     res.json({
       success: true,

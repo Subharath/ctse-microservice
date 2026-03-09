@@ -7,6 +7,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const logger = require('../utils/logger');
+const { getContext } = require('../utils/context');
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
@@ -62,10 +63,10 @@ const callProductService = async (method, path, data = null, headers = {}) => {
  */
 router.post('/', async (req, res, next) => {
   try {
-    const userId = req.headers['x-user-id'];
+    const context = getContext(req);
     const { items, shippingAddress, notes } = req.body;
 
-    if (!userId) {
+    if (context.userId === 'anonymous') {
       return res.status(401).json({
         success: false,
         message: 'User ID is required',
@@ -81,14 +82,7 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // TODO: Implement order orchestration
-    // 1. Verify user exists with User Service
-    // 2. Check product availability with Product Service
-    // 3. Reserve/update product stock
-    // 4. Create order in MongoDB
-    // 5. Return order confirmation
-
-    logger.info('Order creation initiated', { userId, itemCount: items.length });
+    logger.info('Order creation initiated', { userId: context.userId, itemCount: items.length, requestId: context.requestId });
 
     res.status(201).json({
       success: true,
@@ -110,19 +104,14 @@ router.post('/', async (req, res, next) => {
 router.get('/:orderId', async (req, res, next) => {
   try {
     const { orderId } = req.params;
-    const userId = req.headers['x-user-id'];
+    const context = getContext(req);
 
-    // TODO: Implement order retrieval
-    // - Get order from MongoDB
-    // - Verify user owns order OR is admin
-    // - Return order details
-
-    logger.debug('Order retrieved', { orderId, userId });
+    logger.debug('Order details requested', { orderId, userId: context.userId, requestId: context.requestId });
 
     res.json({
       success: true,
       data: {
-        // TODO: Return order
+        // TODO: Return order details
       }
     });
 

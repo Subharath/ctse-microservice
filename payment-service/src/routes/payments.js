@@ -9,29 +9,28 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const { getContext } = require('../utils/context');
 
 router.post('/', async (req, res, next) => {
   try {
-    const userId = req.headers['x-user-id'];
+    const context = getContext(req);
     const { orderId, amount, currency = 'USD', method } = req.body;
 
-    if (!userId || !orderId || !amount) {
+    if (context.userId === 'anonymous' || !orderId || !amount) {
       return res.status(400).json({
         success: false,
-        message: 'userId (header), orderId, and amount are required',
+        message: 'User (via auth), orderId, and amount are required',
         code: 'VALIDATION_ERROR'
       });
     }
 
-    // TODO: Implement payment persistence in MongoDB
-    // TODO: Integrate payment gateway provider in future iteration
-    logger.info('Payment creation requested', { userId, orderId, amount, method });
+    logger.info('Payment creation requested', { userId: context.userId, orderId, amount, method, requestId: context.requestId });
 
     res.status(201).json({
       success: true,
       data: {
         paymentId: 'pending-implementation',
-        userId,
+        userId: context.userId,
         orderId,
         amount,
         currency,
@@ -47,10 +46,9 @@ router.post('/', async (req, res, next) => {
 router.get('/order/:orderId', async (req, res, next) => {
   try {
     const { orderId } = req.params;
-    const userId = req.headers['x-user-id'];
+    const context = getContext(req);
 
-    // TODO: Implement payment fetch by orderId
-    logger.debug('Payment lookup by order', { orderId, userId });
+    logger.debug('Payment lookup by order', { orderId, userId: context.userId, requestId: context.requestId });
 
     res.json({
       success: true,
@@ -67,10 +65,9 @@ router.get('/order/:orderId', async (req, res, next) => {
 router.get('/:paymentId', async (req, res, next) => {
   try {
     const { paymentId } = req.params;
-    const userId = req.headers['x-user-id'];
+    const context = getContext(req);
 
-    // TODO: Implement payment fetch by paymentId
-    logger.debug('Payment lookup', { paymentId, userId });
+    logger.debug('Payment lookup', { paymentId, userId: context.userId, requestId: context.requestId });
 
     res.json({
       success: true,

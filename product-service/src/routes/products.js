@@ -9,6 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const { getContext } = require('../utils/context');
 
 /**
  * GET /products
@@ -17,13 +18,9 @@ const logger = require('../utils/logger');
 router.get('/', async (req, res, next) => {
   try {
     const { page = 1, limit = 10, search, category } = req.query;
+    const context = getContext(req);
 
-    // TODO: Implement product listing
-    // - Query MongoDB with pagination
-    // - Apply filters (search, category)
-    // - Return products array
-
-    logger.debug('Products listed', { page, limit });
+    logger.debug('Products listed', { page, limit, userId: context.userId, requestId: context.requestId });
 
     res.json({
       success: true,
@@ -49,12 +46,9 @@ router.get('/', async (req, res, next) => {
 router.get('/:productId', async (req, res, next) => {
   try {
     const { productId } = req.params;
+    const context = getContext(req);
 
-    // TODO: Implement product fetch
-    // - Query MongoDB by ID
-    // - Return product details
-
-    logger.debug('Product details requested', { productId });
+    logger.debug('Product details requested', { productId, userId: context.userId, requestId: context.requestId });
 
     res.json({
       success: true,
@@ -75,10 +69,9 @@ router.get('/:productId', async (req, res, next) => {
 router.get('/:productId/availability', async (req, res, next) => {
   try {
     const { productId } = req.params;
+    const context = getContext(req);
 
-    // TODO: Implement availability check
-    // - Query product stock
-    // - Return in_stock and quantity
+    logger.debug('Product availability checked', { productId, requestId: context.requestId });
 
     res.json({
       success: true,
@@ -103,13 +96,9 @@ router.put('/:productId/stock', async (req, res, next) => {
   try {
     const { productId } = req.params;
     const { quantity, operation } = req.body;
+    const context = getContext(req);
 
-    // TODO: Implement stock update
-    // - Verify admin role OR service-to-service call
-    // - Update stock in MongoDB
-    // - Log inventory change
-
-    logger.info('Stock updated', { productId, quantity, operation });
+    logger.info('Stock update requested', { productId, quantity, operation, requestId: context.requestId });
 
     res.json({
       success: true,
