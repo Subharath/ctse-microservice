@@ -103,12 +103,32 @@ router.put('/:productId/stock', async (req, res, next) => {
     const { quantity, operation } = req.body;
     const context = getContext(req);
 
+    const isInternalService = req.headers['x-service-auth'] === 'order-service';
+    if (context.userRole !== 'admin' && !isInternalService) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update stock',
+        code: 'FORBIDDEN'
+      });
+    }
+
     if (!quantity || !operation || !['increase', 'decrease'].includes(operation)) {
       return res.status(400).json({
         success: false,
         message: 'quantity and operation (increase/decrease) are required',
         code: 'VALIDATION_ERROR'
       });
+    }
+
+    if (operation === 'decrease') {
+      const availability = await ProductModel.checkStock(productId, parseInt(quantity, 10));
+      if (!availability.available) {
+        return res.status(400).json({
+          success: false,
+          message: availability.reason,
+          code: 'INSUFFICIENT_STOCK'
+        });
+      }
     }
 
     const quantityChange = operation === 'increase' ? quantity : -quantity;
