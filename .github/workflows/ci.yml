@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  service-ci:
+    name: Service CI (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - user-service
+          - product-service
+          - order-service
+          - payment-service
+          - cart-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: npm ci
+
+      - name: Syntax check
+        working-directory: ${{ matrix.service }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          find src -type f -name "*.js" -print0 | xargs -0 -I{} node -c "{}"
+
+  docker-compose-validate:
+    name: Docker Compose Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config -q
+
+  docker-build-smoke:
+    name: Docker Build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            context: ./api-gateway
+            dockerfile: ./api-gateway/Dockerfile
+          - service: user-service
+            context: ./user-service
+            dockerfile: ./user-service/Dockerfile
+          - service: product-service
+            context: ./product-service
+            dockerfile: ./product-service/Dockerfile
+          - service: order-service
+            context: ./order-service
+            dockerfile: ./order-service/Dockerfile
+          - service: payment-service
+            context: ./payment-service
+            dockerfile: ./payment-service/Dockerfile
+          - service: cart-service
+            context: ./cart-service
+            dockerfile: ./cart-service/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "ctse-${{ matrix.service }}:ci" \
+            "${{ matrix.context }}"
