@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/api-gateway"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/user-service"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/product-service"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/order-service"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/payment-service"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/cart-service"
+    schedule:
+      interval: "weekly"
