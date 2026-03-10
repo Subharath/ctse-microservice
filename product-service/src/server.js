@@ -69,6 +69,11 @@ const startServer = async () => {
     await db.connect();
     await ProductModel.initializeCollection();
 
+    let seededCount = 0;
+    if (process.env.SEED_DEMO_PRODUCTS !== 'false') {
+      seededCount = await ProductModel.seedDemoProducts();
+    }
+
     const banner = `
 ╔════════════════════════════════════════════════════════════╗
 ║                 PRODUCT SERVICE                            ║
@@ -78,6 +83,7 @@ const startServer = async () => {
   ├─ Port: ${PORT}
   ├─ Environment: ${process.env.NODE_ENV || 'development'}
   ├─ MongoDB: Connected ✓
+  ├─ Demo Products Seeded: ${seededCount}
   └─ Timestamp: ${new Date().toISOString()}
   
 📝 Documentation: See ../ for detailed guides
@@ -85,15 +91,15 @@ const startServer = async () => {
     
     console.log(banner);
 
+    app.listen(PORT, () => {
+      console.log(`✅ Product Service ready at http://localhost:${PORT}\n`);
+    });
   } catch (error) {
     console.error('❌ Failed to start server:', error.message);
     process.exit(1);
   }
 };
 
-app.listen(PORT, () => {
-  startServer();
-  console.log(`✅ Product Service ready at http://localhost:${PORT}\n`);
-});
+startServer();
 
 module.exports = app;
