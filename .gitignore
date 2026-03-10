@@ -1,0 +1,131 @@
+# Environment Variables
+# NEVER commit .env files with secrets!
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.env.swp
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Testing
+coverage/
+.nyc_output/
+
+# Build & Dist
+dist/
+build/
+out/
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+logs/
+*.log
+
+# Docker
+.dockerignore
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+mongo-data/
+mongodb-data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# System
+.DS_Store
+Thumbs.db
+*.pid
+*.seed
+*.pid.lock
+
+# IDE specific
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/extensions.json
+.vscode/*.code-snippets
+
+# Misc
+.cache/
+.parcel-cache/
+dist/
+.vercel
+
+# Production
+.next/
+out/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# dotenv environment variables file (if you are using dotenv package)
+.env
+.env.test
+.env.production.local
+.env.development.local
+.env.staging.local
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# JetBrains
+*.iml
+*.ipr
+out/
+
+# venv
+venv/
+ENV/
+
+# SonarCloud
+.scannerwork/
+
+# Temporary
+*.bak
+*.backup
+~*
+
