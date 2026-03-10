@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const requestLogger = (req, res, next) => {
   // Generate unique request ID
   req.id = uuidv4();
+  req.requestId = req.id;
   
   // Record request start time
   req.startTime = Date.now();
