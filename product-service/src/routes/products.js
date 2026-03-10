@@ -10,6 +10,7 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 const { getContext } = require('../utils/context');
+const ProductModel = require('../db/models/Product');
 
 /**
  * GET /products
@@ -17,21 +18,17 @@ const { getContext } = require('../utils/context');
  */
 router.get('/', async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search, category } = req.query;
+    const { page = 1, limit = 10, category } = req.query;
     const context = getContext(req);
+
+    const result = await ProductModel.getProducts(parseInt(page), parseInt(limit), category);
 
     logger.debug('Products listed', { page, limit, userId: context.userId, requestId: context.requestId });
 
     res.json({
       success: true,
-      data: {
-        // TODO: Return products array
-      },
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: 0
-      }
+      data: result.products,
+      pagination: result.pagination
     });
 
   } catch (error) {
@@ -48,13 +45,21 @@ router.get('/:productId', async (req, res, next) => {
     const { productId } = req.params;
     const context = getContext(req);
 
+    const product = await ProductModel.getProductById(productId);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+        code: 'PRODUCT_NOT_FOUND'
+      });
+    }
+
     logger.debug('Product details requested', { productId, userId: context.userId, requestId: context.requestId });
 
     res.json({
       success: true,
-      data: {
-        // TODO: Return product object
-      }
+      data: product
     });
 
   } catch (error) {
@@ -69,18 +74,18 @@ router.get('/:productId', async (req, res, next) => {
 router.get('/:productId/availability', async (req, res, next) => {
   try {
     const { productId } = req.params;
+    const { quantity = 1 } = req.query;
     const context = getContext(req);
+
+    const availability = await ProductModel.checkStock(productId, parseInt(quantity));
 
     logger.debug('Product availability checked', { productId, requestId: context.requestId });
 
     res.json({
-      success: true,
-      data: {
-        productId,
-        in_stock: true,
-        quantity: 0,
-        // TODO: Return actual values
-      }
+      success: availability.available,
+      data: availability.available ? availability.data : null,
+      in_stock: availability.available,
+      reason: availability.reason
     });
 
   } catch (error) {
@@ -98,14 +103,33 @@ router.put('/:productId/stock', async (req, res, next) => {
     const { quantity, operation } = req.body;
     const context = getContext(req);
 
+    if (!quantity || !operation || !['increase', 'decrease'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'quantity and operation (increase/decrease) are required',
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    const quantityChange = operation === 'increase' ? quantity : -quantity;
+    const updated = await ProductModel.updateStock(productId, quantityChange);
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+        code: 'PRODUCT_NOT_FOUND'
+      });
+    }
+
     logger.info('Stock update requested', { productId, quantity, operation, requestId: context.requestId });
 
     res.json({
       success: true,
       message: 'Stock updated successfully',
       data: {
-        productId,
-        // TODO: Return updated stock info
+        productId: updated.productId,
+        newStock: updated.stock
       }
     });
 
