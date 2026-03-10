@@ -12,21 +12,28 @@ const axios = require('axios');
 const router = express.Router();
 const logger = require('../utils/logger');
 const { getContext } = require('../utils/context');
+const CartModel = require('../db/models/Cart');
 
 const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
 
-const callProductService = async (method, path) => {
+const callProductService = async (req, method, path) => {
   try {
     const response = await axios({
       method,
       url: `${PRODUCT_SERVICE_URL}${path}`,
       timeout: 5000,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-ID': req.headers['x-user-id'],
+        'X-User-Role': req.headers['x-user-role'],
+        'X-Request-ID': req.headers['x-request-id']
+      }
     });
-    return { success: true, data: response.data };
+    return { success: true, data: response.data, status: response.status };
   } catch (error) {
     return {
       success: false,
+      status: error.response?.status || 503,
       data: error.response?.data || { message: 'Product Service unavailable' }
     };
   }
@@ -47,15 +54,11 @@ router.get('/:userId', async (req, res, next) => {
     }
 
     logger.debug('Cart requested', { userId, requestId: context.requestId });
+    const cart = await CartModel.getOrCreateCart(userId);
 
     res.json({
       success: true,
-      data: {
-        userId,
-        items: [],
-        totalItems: 0,
-        totalPrice: 0
-      }
+      data: cart
     });
   } catch (error) {
     next(error);
@@ -77,30 +80,34 @@ router.post('/:userId/items', async (req, res, next) => {
       });
     }
 
-    if (!productId) {
+    if (!productId || quantity < 1) {
       return res.status(400).json({
         success: false,
-        message: 'productId is required',
+        message: 'productId is required and quantity must be greater than 0',
         code: 'VALIDATION_ERROR'
       });
     }
 
     // Validate product availability before adding to cart
-    const availability = await callProductService('GET', `/products/${productId}/availability`);
-    if (!availability.success) {
-      return res.status(503).json(availability.data);
+    const availability = await callProductService(req, 'GET', `/products/${productId}/availability?quantity=${quantity}`);
+    if (!availability.success || !availability.data?.success) {
+      return res.status(availability.status || 503).json(availability.data);
     }
+
+    const product = availability.data.data;
+    const cart = await CartModel.addItem(userId, {
+      productId,
+      name: product.name,
+      price: product.price,
+      quantity
+    });
 
     logger.info('Cart item add requested', { userId, productId, quantity, requestId: context.requestId });
 
     res.status(201).json({
       success: true,
       message: 'Item added to cart',
-      data: {
-        userId,
-        productId,
-        quantity
-      }
+      data: cart
     });
   } catch (error) {
     next(error);
@@ -130,16 +137,26 @@ router.put('/:userId/items/:productId', async (req, res, next) => {
       });
     }
 
+    const availability = await callProductService(req, 'GET', `/products/${productId}/availability?quantity=${quantity}`);
+    if (!availability.success || !availability.data?.success) {
+      return res.status(availability.status || 503).json(availability.data);
+    }
+
+    const cart = await CartModel.updateItemQuantity(userId, productId, quantity);
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cart item not found',
+        code: 'CART_ITEM_NOT_FOUND'
+      });
+    }
+
     logger.info('Cart item update requested', { userId, productId, quantity, requestId: context.requestId });
 
     res.json({
       success: true,
       message: 'Cart item updated',
-      data: {
-        userId,
-        productId,
-        quantity
-      }
+      data: cart
     });
   } catch (error) {
     next(error);
@@ -160,12 +177,21 @@ router.delete('/:userId/items/:productId', async (req, res, next) => {
       });
     }
 
+    const cart = await CartModel.removeItem(userId, productId);
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cart item not found',
+        code: 'CART_ITEM_NOT_FOUND'
+      });
+    }
+
     logger.info('Cart item remove requested', { userId, productId, requestId: context.requestId });
 
     res.json({
       success: true,
       message: 'Cart item removed',
-      data: { userId, productId }
+      data: cart
     });
   } catch (error) {
     next(error);
@@ -175,14 +201,23 @@ router.delete('/:userId/items/:productId', async (req, res, next) => {
 router.delete('/:userId', async (req, res, next) => {
   try {
     const { userId } = req.params;
+    const context = getContext(req);
 
-    // TODO: Clear entire cart in MongoDB.
-    logger.info('Cart clear requested', { userId });
+    if (context.userId !== userId && context.userRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this cart',
+        code: 'FORBIDDEN'
+      });
+    }
+
+    const cart = await CartModel.clearCart(userId);
+    logger.info('Cart clear requested', { userId, requestId: context.requestId });
 
     res.json({
       success: true,
       message: 'Cart cleared',
-      data: { userId }
+      data: cart
     });
   } catch (error) {
     next(error);
