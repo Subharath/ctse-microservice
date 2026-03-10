@@ -115,7 +115,7 @@ const updateOrderStatus = async (orderId, status) => {
     { returnDocument: 'after' }
   );
 
-  return result.value;
+  return result?.value || result;
 };
 
 module.exports = {
