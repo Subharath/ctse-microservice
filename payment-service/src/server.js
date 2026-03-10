@@ -12,6 +12,8 @@ const requestLogger = require('./middleware/requestLogger');
 const errorHandler = require('./middleware/errorHandler');
 const healthRoutes = require('./routes/health');
 const paymentRoutes = require('./routes/payments');
+const db = require('./db/db');
+const PaymentModel = require('./db/models/Payment');
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -53,8 +55,19 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-app.listen(PORT, () => {
-  console.log(`\nPayment Service running on http://localhost:${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await db.connect();
+    await PaymentModel.initializeCollection();
+    app.listen(PORT, () => {
+      console.log(`\nPayment Service running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start payment service:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;
