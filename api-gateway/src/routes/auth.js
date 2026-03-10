@@ -63,7 +63,7 @@ router.post('/register', async (req, res, next) => {
     }
 
     // Call User Service
-    const result = await callService('POST', '/users/register', {
+    const result = await callService('POST', '/auth/register', {
       email,
       password,
       name
@@ -102,7 +102,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     // Call User Service
-    const result = await callService('POST', '/users/login', {
+    const result = await callService('POST', '/auth/login', {
       email,
       password
     });
@@ -139,7 +139,7 @@ router.post('/refresh', async (req, res, next) => {
     }
 
     // Call User Service
-    const result = await callService('POST', '/users/refresh', {
+    const result = await callService('POST', '/auth/refresh', {
       refreshToken
     });
 
