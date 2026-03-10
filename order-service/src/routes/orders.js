@@ -83,11 +83,28 @@ router.post('/', async (req, res, next) => {
       });
     }
 
+    const userCheck = await callUserService(
+      'GET',
+      `/profile/${context.userId}/exists`,
+      null,
+      {
+        'X-Request-ID': context.requestId,
+        'X-User-ID': context.userId,
+        'X-User-Role': context.userRole
+      }
+    );
+
+    if (!userCheck.success || !userCheck.data?.success || !userCheck.data.data?.exists) {
+      return res.status(userCheck.status || 404).json({
+        success: false,
+        message: 'User not found. Cannot create order.',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+
     // INTEGRATION POINT: Call Product Service to validate stock
     let totalPrice = 0;
     const validatedItems = [];
-
-    const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
 
     for (const item of items) {
       try {
@@ -143,6 +160,32 @@ router.post('/', async (req, res, next) => {
     };
 
     const order = await OrderModel.createOrder(orderData);
+
+    for (const item of validatedItems) {
+      const stockUpdate = await callProductService(
+        'PUT',
+        `/products/${item.productId}/stock`,
+        {
+          quantity: item.quantity,
+          operation: 'decrease'
+        },
+        {
+          'X-Request-ID': context.requestId,
+          'X-User-ID': context.userId,
+          'X-User-Role': context.userRole,
+          'X-Service-Auth': 'order-service'
+        }
+      );
+
+      if (!stockUpdate.success || !stockUpdate.data?.success) {
+        await OrderModel.updateOrderStatus(order.orderId, 'failed');
+        return res.status(stockUpdate.status || 503).json({
+          success: false,
+          message: `Stock reservation failed for product ${item.productId}`,
+          code: 'STOCK_UPDATE_FAILED'
+        });
+      }
+    }
 
     logger.info('Order created successfully', {
       orderId: order.orderId,
@@ -217,18 +260,25 @@ router.get('/:orderId', async (req, res, next) => {
 router.get('/user/:userId', async (req, res, next) => {
   try {
     const { userId } = req.params;
+    const context = getContext(req);
 
-    // TODO: Implement user orders retrieval
-    // - Get orders from MongoDB by userId
-    // - Return orders array
+    if (userId !== context.userId && context.userRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access these orders',
+        code: 'FORBIDDEN'
+      });
+    }
 
-    logger.debug('User orders retrieved', { userId });
+    const page = parseInt(req.query.page || '1', 10);
+    const limit = parseInt(req.query.limit || '10', 10);
+    const orders = await OrderModel.getOrdersByUserId(userId, page, limit);
+
+    logger.debug('User orders retrieved', { userId, requestId: context.requestId });
 
     res.json({
       success: true,
-      data: {
-        // TODO: Return orders array
-      }
+      data: orders
     });
 
   } catch (error) {
@@ -244,6 +294,15 @@ router.put('/:orderId/status', async (req, res, next) => {
   try {
     const { orderId } = req.params;
     const { status } = req.body;
+    const context = getContext(req);
+
+    if (context.userRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin can update order status',
+        code: 'FORBIDDEN'
+      });
+    }
 
     if (!status) {
       return res.status(400).json({
@@ -253,19 +312,30 @@ router.put('/:orderId/status', async (req, res, next) => {
       });
     }
 
-    // TODO: Implement status update
-    // - Validate status value
-    // - Update order in MongoDB
-    // - Log status change
+    const allowedStatuses = ['pending', 'confirmed', 'paid', 'shipped', 'delivered', 'cancelled', 'failed'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order status',
+        code: 'VALIDATION_ERROR'
+      });
+    }
 
-    logger.info('Order status updated', { orderId, status });
+    const updatedOrder = await OrderModel.updateOrderStatus(orderId, status);
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+        code: 'ORDER_NOT_FOUND'
+      });
+    }
+
+    logger.info('Order status updated', { orderId, status, requestId: context.requestId });
 
     res.json({
       success: true,
       message: 'Order status updated successfully',
-      data: {
-        // TODO: Return updated order
-      }
+      data: updatedOrder
     });
 
   } catch (error) {
