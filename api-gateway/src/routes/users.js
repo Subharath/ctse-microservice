@@ -6,21 +6,17 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const logger = require('../utils/logger');
+const getProxyHeaders = require('../utils/proxyHeaders');
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 
-const callService = async (method, path, data = null, headers = {}, userId = null) => {
+const callService = async (method, path, data = null, headers = {}) => {
   try {
     const config = {
       method,
       url: `${USER_SERVICE_URL}${path}`,
       timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-        ...headers
-      }
+      headers
     };
 
     if (data) {
@@ -56,7 +52,7 @@ router.get('/:userId', async (req, res, next) => {
       });
     }
 
-    const result = await callService('GET', `/users/${userId}`, null, {}, req.user.id);
+    const result = await callService('GET', `/profile/${userId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -90,10 +86,10 @@ router.put('/:userId', async (req, res, next) => {
       });
     }
 
-    const result = await callService('PUT', `/users/${userId}`, {
+    const result = await callService('PUT', `/profile/${userId}`, {
       name,
       email
-    }, {}, req.user.id);
+    }, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -118,7 +114,7 @@ router.get('/:userId/exists', async (req, res, next) => {
   try {
     const { userId } = req.params;
 
-    const result = await callService('GET', `/users/${userId}/exists`, null, {}, req.user.id);
+    const result = await callService('GET', `/profile/${userId}/exists`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
