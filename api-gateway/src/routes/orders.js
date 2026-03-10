@@ -6,22 +6,17 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const logger = require('../utils/logger');
+const getProxyHeaders = require('../utils/proxyHeaders');
 
 const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:3003';
 
-const callService = async (method, path, data = null, headers = {}, userId = null) => {
+const callService = async (method, path, data = null, headers = {}) => {
   try {
     const config = {
       method,
       url: `${ORDER_SERVICE_URL}${path}`,
       timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-        Authorization: headers.authorization,
-        ...headers
-      }
+      headers
     };
 
     if (data) {
@@ -62,9 +57,7 @@ router.post('/', async (req, res, next) => {
       items,
       shippingAddress,
       notes
-    }, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    }, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -89,9 +82,7 @@ router.get('/:orderId', async (req, res, next) => {
   try {
     const { orderId } = req.params;
 
-    const result = await callService('GET', `/orders/${orderId}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('GET', `/orders/${orderId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -113,9 +104,7 @@ router.get('/:orderId', async (req, res, next) => {
  */
 router.get('/user/me', async (req, res, next) => {
   try {
-    const result = await callService('GET', `/orders/user/${req.user.id}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('GET', `/orders/user/${req.user.id}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -148,9 +137,7 @@ router.get('/user/:userId', async (req, res, next) => {
       });
     }
 
-    const result = await callService('GET', `/orders/user/${userId}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('GET', `/orders/user/${userId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -194,9 +181,7 @@ router.put('/:orderId/status', async (req, res, next) => {
 
     const result = await callService('PUT', `/orders/${orderId}/status`, {
       status
-    }, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    }, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
