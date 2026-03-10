@@ -23,6 +23,30 @@ const { v4: uuidv4 } = require('uuid');
 
 const COLLECTION = 'products';
 
+const DEMO_PRODUCTS = [
+  {
+    name: 'Wireless Headphones',
+    description: 'Noise-cancelling over-ear headphones for viva demos and daily use.',
+    price: 149.99,
+    stock: 25,
+    category: 'electronics'
+  },
+  {
+    name: 'Mechanical Keyboard',
+    description: 'Compact mechanical keyboard with tactile switches.',
+    price: 89.5,
+    stock: 18,
+    category: 'accessories'
+  },
+  {
+    name: 'USB-C Dock',
+    description: 'Multi-port dock with HDMI, USB-A, and Ethernet.',
+    price: 64.0,
+    stock: 30,
+    category: 'accessories'
+  }
+];
+
 // Initialize collection with indexes
 const initializeCollection = async () => {
   try {
@@ -91,6 +115,36 @@ const getProducts = async (page = 1, limit = 10, category = null) => {
   };
 };
 
+const countProducts = async () => {
+  const db = getDb();
+  return db.collection(COLLECTION).countDocuments();
+};
+
+const seedDemoProducts = async () => {
+  const db = getDb();
+  const collection = db.collection(COLLECTION);
+  const existingCount = await collection.countDocuments();
+
+  if (existingCount > 0) {
+    return 0;
+  }
+
+  const timestamp = new Date();
+  const docs = DEMO_PRODUCTS.map((product) => ({
+    productId: uuidv4(),
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    stock: product.stock,
+    category: product.category,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }));
+
+  await collection.insertMany(docs);
+  return docs.length;
+};
+
 const updateStock = async (productId, quantity) => {
   const db = getDb();
   const collection = db.collection(COLLECTION);
@@ -104,7 +158,7 @@ const updateStock = async (productId, quantity) => {
     { returnDocument: 'after' }
   );
 
-  return result.value;
+  return result?.value || result;
 };
 
 const checkStock = async (productId, requiredQuantity) => {
@@ -141,6 +195,8 @@ module.exports = {
   createProduct,
   getProductById,
   getProducts,
+  countProducts,
+  seedDemoProducts,
   updateStock,
   checkStock
 };
