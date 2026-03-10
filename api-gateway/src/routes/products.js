@@ -6,7 +6,7 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const logger = require('../utils/logger');
+const getProxyHeaders = require('../utils/proxyHeaders');
 
 const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
 
@@ -50,7 +50,7 @@ router.get('/', async (req, res, next) => {
     if (search) path += `&search=${search}`;
     if (category) path += `&category=${category}`;
 
-    const result = await callService('GET', path);
+    const result = await callService('GET', path, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -74,7 +74,7 @@ router.get('/:productId', async (req, res, next) => {
   try {
     const { productId } = req.params;
 
-    const result = await callService('GET', `/products/${productId}`);
+    const result = await callService('GET', `/products/${productId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -98,7 +98,8 @@ router.get('/:productId/availability', async (req, res, next) => {
   try {
     const { productId } = req.params;
 
-    const result = await callService('GET', `/products/${productId}/availability`);
+    const { quantity = 1 } = req.query;
+    const result = await callService('GET', `/products/${productId}/availability?quantity=${quantity}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -144,7 +145,7 @@ router.put('/:productId/stock', async (req, res, next) => {
     const result = await callService('PUT', `/products/${productId}/stock`, {
       quantity,
       operation
-    });
+    }, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
