@@ -13,6 +13,8 @@ const errorHandler = require('./middleware/errorHandler');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
+const db = require('./db/db');
+const UserModel = require('./db/models/User');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -63,8 +65,13 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Startup
-const startServer = () => {
-  const banner = `
+const startServer = async () => {
+  try {
+    // Connect to MongoDB
+    await db.connect();
+    await UserModel.initializeCollection();
+
+    const banner = `
 ╔════════════════════════════════════════════════════════════╗
 ║                   USER SERVICE                             ║
 ╚════════════════════════════════════════════════════════════╝
@@ -72,13 +79,18 @@ const startServer = () => {
 🚀 Server Starting...
   ├─ Port: ${PORT}
   ├─ Environment: ${process.env.NODE_ENV || 'development'}
-  ├─ MongoDB: ${process.env.MONGODB_URI || 'mongodb://localhost:27017/user_db'}
+  ├─ MongoDB: Connected ✓
   └─ Timestamp: ${new Date().toISOString()}
   
 📝 Documentation: See ../ for detailed guides
   `;
-  
-  console.log(banner);
+    
+    console.log(banner);
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    process.exit(1);
+  }
 };
 
 app.listen(PORT, () => {

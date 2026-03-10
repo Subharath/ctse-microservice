@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 const { getUserId, getContext, hasRole } = require('../utils/context');
+const UserModel = require('../db/models/User');
 
 /**
  * GET /profile/:userId
@@ -28,12 +29,26 @@ router.get('/:userId', async (req, res, next) => {
       });
     }
 
-    logger.debug('Profile requested', { userId, requestId: context.requestId });
+    const user = await UserModel.getUserById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+
+    logger.debug('Profile retrieved', { userId, requestId: context.requestId });
 
     res.json({
       success: true,
       data: {
-        // TODO: Return user profile from MongoDB
+        userId: user.userId,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        createdAt: user.createdAt
       }
     });
 
@@ -61,13 +76,42 @@ router.put('/:userId', async (req, res, next) => {
       });
     }
 
-    logger.info('Profile update requested', { userId, requestId: context.requestId });
+    // Validate input
+    if (!name && !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least name or email is required',
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Update user
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (phone) updateData.phone = phone;
+    if (address) updateData.address = address;
+
+    const updatedUser = await UserModel.updateUser(userId, updateData);
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+
+    logger.info('Profile updated', { userId, requestId: context.requestId });
 
     res.json({
       success: true,
       message: 'Profile updated successfully',
       data: {
-        // TODO: Return updated profile from MongoDB
+        userId: updatedUser.userId,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role
       }
     });
 
