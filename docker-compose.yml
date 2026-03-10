@@ -1,0 +1,191 @@
+version: '3.9'
+
+services:
+  # API Gateway - Entry point for all requests
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: ctse-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      JWT_SECRET: your-secret-key-change-in-production
+      CORS_ORIGIN: "*"
+      # Service URLs (use service names for DNS resolution)
+      USER_SERVICE_URL: http://user-service:3001
+      PRODUCT_SERVICE_URL: http://product-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+      CART_SERVICE_URL: http://cart-service:3005
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - payment-service
+      - cart-service
+    networks:
+      - ctse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # User Service
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: ctse-user-service
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://mongodb:27017/user_db
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - ctse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Product Service
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: ctse-product-service
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      MONGODB_URI: mongodb://mongodb:27017/product_db
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - ctse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Order Service
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: ctse-order-service
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      MONGODB_URI: mongodb://mongodb:27017/order_db
+      PRODUCT_SERVICE_URL: http://product-service:3002
+      USER_SERVICE_URL: http://user-service:3001
+    depends_on:
+      product-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      mongodb:
+        condition: service_healthy
+    networks:
+      - ctse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Payment Service
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: ctse-payment-service
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      MONGODB_URI: mongodb://mongodb:27017/payment_db
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - ctse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3004/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Cart Service
+  cart-service:
+    build:
+      context: ./cart-service
+      dockerfile: Dockerfile
+    container_name: ctse-cart-service
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      MONGODB_URI: mongodb://mongodb:27017/cart_db
+      PRODUCT_SERVICE_URL: http://product-service:3002
+    depends_on:
+      product-service:
+        condition: service_started
+      mongodb:
+        condition: service_healthy
+    networks:
+      - ctse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3005/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # MongoDB Service (Local database for testing)
+  mongodb:
+    image: mongo:latest
+    container_name: ctse-mongodb
+    environment:
+      MONGO_INITDB_DATABASE: test
+    ports:
+      - "27017:27017"
+    networks:
+      - ctse-network
+    healthcheck:
+      test: echo 'db.getUser("user")' | mongosh localhost/test --quiet || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    volumes:
+      - mongodb_data:/data/db
+
+networks:
+  ctse-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
