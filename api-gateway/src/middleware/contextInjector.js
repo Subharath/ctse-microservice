@@ -21,8 +21,9 @@ const logger = require('../utils/logger');
 const contextInjector = (req, res, next) => {
   try {
     // Generate unique request ID (or use existing one for tracing)
-    const requestId = req.id || uuidv4();
+    const requestId = req.requestId || req.id || uuidv4();
     req.id = requestId;
+    req.requestId = requestId;
 
     // Extract user context from auth middleware (req.user is set by authMiddleware)
     if (req.user) {
