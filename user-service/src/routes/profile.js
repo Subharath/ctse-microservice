@@ -127,15 +127,12 @@ router.put('/:userId', async (req, res, next) => {
 router.get('/:userId/exists', async (req, res, next) => {
   try {
     const { userId } = req.params;
-
-    // TODO: Implement existence check
-    // - Query MongoDB for user
-    // - Return exists: true/false
+    const exists = await UserModel.userExists(userId);
 
     res.json({
       success: true,
       data: {
-        exists: true,
+        exists,
         userId
       }
     });
