@@ -44,10 +44,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      MONGODB_URI: mongodb://mongodb:27017/user_db
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      MONGODB_URI: ${USER_MONGODB_URI}
     networks:
       - ctse-network
     healthcheck:
@@ -68,10 +65,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
-      MONGODB_URI: mongodb://mongodb:27017/product_db
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      MONGODB_URI: ${PRODUCT_MONGODB_URI}
     networks:
       - ctse-network
     healthcheck:
@@ -92,7 +86,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3003
-      MONGODB_URI: mongodb://mongodb:27017/order_db
+      MONGODB_URI: ${ORDER_MONGODB_URI}
       PRODUCT_SERVICE_URL: http://product-service:3002
       USER_SERVICE_URL: http://user-service:3001
     depends_on:
@@ -100,8 +94,6 @@ services:
         condition: service_started
       user-service:
         condition: service_started
-      mongodb:
-        condition: service_healthy
     networks:
       - ctse-network
     healthcheck:
@@ -122,10 +114,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3004
-      MONGODB_URI: mongodb://mongodb:27017/payment_db
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      MONGODB_URI: ${PAYMENT_MONGODB_URI}
     networks:
       - ctse-network
     healthcheck:
@@ -146,13 +135,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3005
-      MONGODB_URI: mongodb://mongodb:27017/cart_db
+      MONGODB_URI: ${CART_MONGODB_URI}
       PRODUCT_SERVICE_URL: http://product-service:3002
     depends_on:
       product-service:
         condition: service_started
-      mongodb:
-        condition: service_healthy
     networks:
       - ctse-network
     healthcheck:
@@ -162,28 +149,6 @@ services:
       retries: 3
       start_period: 10s
 
-  # MongoDB Service (Local database for testing)
-  mongodb:
-    image: mongo:latest
-    container_name: ctse-mongodb
-    environment:
-      MONGO_INITDB_DATABASE: test
-    ports:
-      - "27017:27017"
-    networks:
-      - ctse-network
-    healthcheck:
-      test: echo 'db.getUser("user")' | mongosh localhost/test --quiet || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    volumes:
-      - mongodb_data:/data/db
-
 networks:
   ctse-network:
     driver: bridge
-
-volumes:
-  mongodb_data:
