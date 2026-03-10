@@ -12,6 +12,8 @@ const requestLogger = require('./middleware/requestLogger');
 const errorHandler = require('./middleware/errorHandler');
 const healthRoutes = require('./routes/health');
 const ordersRoutes = require('./routes/orders');
+const db = require('./db/db');
+const OrderModel = require('./db/models/Order');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -61,8 +63,13 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Startup
-const startServer = () => {
-  const banner = `
+const startServer = async () => {
+  try {
+    // Connect to MongoDB
+    await db.connect();
+    await OrderModel.initializeCollection();
+
+    const banner = `
 ╔════════════════════════════════════════════════════════════╗
 ║                   ORDER SERVICE                            ║
 ╚════════════════════════════════════════════════════════════╝
@@ -70,13 +77,18 @@ const startServer = () => {
 🚀 Server Starting...
   ├─ Port: ${PORT}
   ├─ Environment: ${process.env.NODE_ENV || 'development'}
-  ├─ MongoDB: ${process.env.MONGODB_URI || 'mongodb://localhost:27017/order_db'}
+  ├─ MongoDB: Connected ✓
   └─ Timestamp: ${new Date().toISOString()}
   
 📝 Documentation: See ../ for detailed guides
   `;
-  
-  console.log(banner);
+    
+    console.log(banner);
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    process.exit(1);
+  }
 };
 
 app.listen(PORT, () => {
