@@ -8,8 +8,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install production dependencies (works even when lockfile is not committed)
+RUN npm install --omit=dev --no-audit --no-fund
 
 # Stage 2: Runtime image
 FROM node:18-alpine
