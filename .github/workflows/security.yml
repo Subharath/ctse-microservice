@@ -35,12 +35,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "18"
-          cache: "npm"
-          cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
       - name: Install dependencies
         working-directory: ${{ matrix.service }}
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Run npm audit (high and critical)
         working-directory: ${{ matrix.service }}
