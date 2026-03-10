@@ -6,21 +6,17 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const getProxyHeaders = require('../utils/proxyHeaders');
 
 const CART_SERVICE_URL = process.env.CART_SERVICE_URL || 'http://localhost:3005';
 
-const callService = async (method, path, data = null, headers = {}, userId = null) => {
+const callService = async (method, path, data = null, headers = {}) => {
   try {
     const config = {
       method,
       url: `${CART_SERVICE_URL}${path}`,
       timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-        Authorization: headers.authorization,
-        ...headers
-      }
+      headers
     };
 
     if (data) {
@@ -56,9 +52,7 @@ router.get('/:userId', async (req, res, next) => {
     if (!validateCartAccess(req, res)) return;
 
     const { userId } = req.params;
-    const result = await callService('GET', `/carts/${userId}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('GET', `/carts/${userId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -75,9 +69,7 @@ router.post('/:userId/items', async (req, res, next) => {
     if (!validateCartAccess(req, res)) return;
 
     const { userId } = req.params;
-    const result = await callService('POST', `/carts/${userId}/items`, req.body, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('POST', `/carts/${userId}/items`, req.body, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -94,9 +86,7 @@ router.put('/:userId/items/:productId', async (req, res, next) => {
     if (!validateCartAccess(req, res)) return;
 
     const { userId, productId } = req.params;
-    const result = await callService('PUT', `/carts/${userId}/items/${productId}`, req.body, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('PUT', `/carts/${userId}/items/${productId}`, req.body, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -113,9 +103,7 @@ router.delete('/:userId/items/:productId', async (req, res, next) => {
     if (!validateCartAccess(req, res)) return;
 
     const { userId, productId } = req.params;
-    const result = await callService('DELETE', `/carts/${userId}/items/${productId}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('DELETE', `/carts/${userId}/items/${productId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -132,9 +120,7 @@ router.delete('/:userId', async (req, res, next) => {
     if (!validateCartAccess(req, res)) return;
 
     const { userId } = req.params;
-    const result = await callService('DELETE', `/carts/${userId}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('DELETE', `/carts/${userId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
