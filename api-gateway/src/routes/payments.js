@@ -6,21 +6,17 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const getProxyHeaders = require('../utils/proxyHeaders');
 
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004';
 
-const callService = async (method, path, data = null, headers = {}, userId = null) => {
+const callService = async (method, path, data = null, headers = {}) => {
   try {
     const config = {
       method,
       url: `${PAYMENT_SERVICE_URL}${path}`,
       timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-        Authorization: headers.authorization,
-        ...headers
-      }
+      headers
     };
 
     if (data) {
@@ -40,9 +36,7 @@ const callService = async (method, path, data = null, headers = {}, userId = nul
 
 router.post('/', async (req, res, next) => {
   try {
-    const result = await callService('POST', '/payments', req.body, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('POST', '/payments', req.body, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -62,9 +56,7 @@ router.get('/order/:orderId', async (req, res, next) => {
   try {
     const { orderId } = req.params;
 
-    const result = await callService('GET', `/payments/order/${orderId}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('GET', `/payments/order/${orderId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -83,9 +75,7 @@ router.get('/:paymentId', async (req, res, next) => {
   try {
     const { paymentId } = req.params;
 
-    const result = await callService('GET', `/payments/${paymentId}`, null, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('GET', `/payments/${paymentId}`, null, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
@@ -111,9 +101,7 @@ router.put('/:paymentId/status', async (req, res, next) => {
     }
 
     const { paymentId } = req.params;
-    const result = await callService('PUT', `/payments/${paymentId}/status`, req.body, {
-      authorization: req.headers.authorization
-    }, req.user.id);
+    const result = await callService('PUT', `/payments/${paymentId}/status`, req.body, getProxyHeaders(req));
 
     if (!result.success) {
       return res.status(result.status).json(result.data);
