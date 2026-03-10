@@ -12,6 +12,8 @@ const requestLogger = require('./middleware/requestLogger');
 const errorHandler = require('./middleware/errorHandler');
 const healthRoutes = require('./routes/health');
 const cartRoutes = require('./routes/carts');
+const db = require('./db/db');
+const CartModel = require('./db/models/Cart');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -53,8 +55,19 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-app.listen(PORT, () => {
-  console.log(`\nCart Service running on http://localhost:${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await db.connect();
+    await CartModel.initializeCollection();
+    app.listen(PORT, () => {
+      console.log(`\nCart Service running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start cart service:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;
