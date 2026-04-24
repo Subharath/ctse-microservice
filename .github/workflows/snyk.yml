@@ -1,0 +1,51 @@
+name: Snyk Security Scan
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 2 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  snyk-scan:
+    name: Snyk SAST Scan (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - user-service
+          - product-service
+          - order-service
+          - payment-service
+          - cart-service
+          - frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: npm install --no-fund --no-audit
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: monitor
+          args: --all-projects --org=${{ secrets.SNYK_ORG_ID }}
+        continue-on-error: true # Prevents the pipeline from failing to ensure all services are scanned
