@@ -15,6 +15,11 @@ This is the actual project repository root.
 
 Team instructions are in `Instructions/`.
 
+Production architecture reference:
+
+- `ARCHITECTURE/PRODUCTION_SYSTEM_BLUEPRINT.md` (overall system diagram + per-service diagrams + production hardening roadmap)
+- `ARCHITECTURE/PROJECT_REPORT.md` (submission-ready report covering architecture, communication, DevOps/security, and challenges)
+
 Start with:
 
 1. `Instructions/00_START_HERE.md`
@@ -103,3 +108,19 @@ For optional SonarCloud extension later:
 3. Add Docker Hub secrets.
 4. Run `Docker Publish` workflow manually.
 5. Deploy published images to your target platform (AWS ECS, Azure Container Apps, or GCP Cloud Run).
+
+## AWS Free Tier Deployment (EC2 + Docker Compose)
+
+Production-ready deployment assets are now included:
+
+- `docker-compose.aws.yml` (hardened compose for EC2)
+- `.env.production.example` (production env template)
+- `frontend/Dockerfile` + `frontend/nginx.conf` (serves SPA and proxies `/api` to gateway)
+- `AWS_FREE_TIER_DEPLOYMENT_GUIDE.md` (step-by-step deployment guide)
+
+Quick start on EC2:
+
+```bash
+cp .env.production.example .env.production
+docker compose -f docker-compose.aws.yml --env-file .env.production up -d --build
+```
