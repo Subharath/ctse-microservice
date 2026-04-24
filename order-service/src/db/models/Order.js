@@ -1,83 +1,50 @@
-/**
- * Order Model
- * 
- * Purpose:
- * Collection structure and helper functions for orders collection
- * 
- * Schema:
- * {
- *   _id: ObjectId,
- *   orderId: string (UUID),
- *   userId: string,
- *   items: [
- *     {
- *       productId: string,
- *       name: string,
- *       quantity: number,
- *       price: number
- *     }
- *   ],
- *   totalPrice: number,
- *   status: string (pending, confirmed, shipped, delivered),
- *   createdAt: date,
- *   updatedAt: date
- * }
- */
+const { getDb } = require('../db')
+const { v4: uuidv4 } = require('uuid')
 
-const { getDb } = require('../db');
-const { v4: uuidv4 } = require('uuid');
+const COLLECTION = 'orders'
 
-const COLLECTION = 'orders';
-
-// Initialize collection with indexes
 const initializeCollection = async () => {
   try {
-    const db = getDb();
-    const collection = db.collection(COLLECTION);
-    
-    // Create index on orderId
-    await collection.createIndex({ orderId: 1 });
-    
-    // Create index on userId for quick lookup
-    await collection.createIndex({ userId: 1 });
+    const collection = getDb().collection(COLLECTION)
+    await collection.createIndex({ orderId: 1 }, { unique: true })
+    await collection.createIndex({ userId: 1 })
   } catch (error) {
     if (error.code === 48) {
-      return;
+      return
     }
-    throw error;
+
+    throw error
   }
-};
+}
 
 const createOrder = async (orderData) => {
-  const db = getDb();
-  const collection = db.collection(COLLECTION);
-
+  const collection = getDb().collection(COLLECTION)
+  const now = new Date()
   const order = {
     orderId: uuidv4(),
     userId: orderData.userId,
     items: orderData.items || [],
     totalPrice: orderData.totalPrice || 0,
+    shippingAddress: orderData.shippingAddress || {},
+    notes: orderData.notes || '',
     status: 'pending',
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
+    inventoryReserved: false,
+    inventoryReleasedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  }
 
-  const result = await collection.insertOne(order);
-  return { ...order, _id: result.insertedId };
-};
+  const result = await collection.insertOne(order)
+  return { ...order, _id: result.insertedId }
+}
 
 const getOrderById = async (orderId) => {
-  const db = getDb();
-  const collection = db.collection(COLLECTION);
-  
-  return await collection.findOne({ orderId });
-};
+  return getDb().collection(COLLECTION).findOne({ orderId })
+}
 
 const getOrdersByUserId = async (userId, page = 1, limit = 10) => {
-  const db = getDb();
-  const collection = db.collection(COLLECTION);
-
-  const skip = (page - 1) * limit;
+  const collection = getDb().collection(COLLECTION)
+  const skip = (page - 1) * limit
 
   const [orders, total] = await Promise.all([
     collection
@@ -86,8 +53,8 @@ const getOrdersByUserId = async (userId, page = 1, limit = 10) => {
       .limit(limit)
       .sort({ createdAt: -1 })
       .toArray(),
-    collection.countDocuments({ userId })
-  ]);
+    collection.countDocuments({ userId }),
+  ])
 
   return {
     orders,
@@ -95,33 +62,38 @@ const getOrdersByUserId = async (userId, page = 1, limit = 10) => {
       page,
       limit,
       total,
-      pages: Math.ceil(total / limit)
-    }
-  };
-};
+      pages: Math.ceil(total / limit),
+    },
+  }
+}
 
-const updateOrderStatus = async (orderId, status) => {
-  const db = getDb();
-  const collection = db.collection(COLLECTION);
-
-  const result = await collection.findOneAndUpdate(
+const updateOrder = async (orderId, updateData) => {
+  const result = await getDb().collection(COLLECTION).findOneAndUpdate(
     { orderId },
     {
-      $set: { 
-        status,
-        updatedAt: new Date()
-      }
+      $set: {
+        ...updateData,
+        updatedAt: new Date(),
+      },
     },
     { returnDocument: 'after' }
-  );
+  )
 
-  return result?.value || result;
-};
+  return result?.value || result
+}
+
+const updateOrderStatus = async (orderId, status, extra = {}) => {
+  return updateOrder(orderId, {
+    status,
+    ...extra,
+  })
+}
 
 module.exports = {
-  initializeCollection,
   createOrder,
   getOrderById,
   getOrdersByUserId,
-  updateOrderStatus
-};
+  initializeCollection,
+  updateOrder,
+  updateOrderStatus,
+}
