@@ -75,30 +75,6 @@ router.post('/', async (req, res, next) => {
 });
 
 /**
- * GET /api/orders/:orderId
- * Get order details
- */
-router.get('/:orderId', async (req, res, next) => {
-  try {
-    const { orderId } = req.params;
-
-    const result = await callService('GET', `/orders/${orderId}`, null, getProxyHeaders(req));
-
-    if (!result.success) {
-      return res.status(result.status).json(result.data);
-    }
-
-    res.json({
-      success: true,
-      data: result.data
-    });
-
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
  * GET /api/orders/user/me
  * Get current user's orders
  */
@@ -148,6 +124,53 @@ router.get('/user/:userId', async (req, res, next) => {
       data: result.data
     });
 
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/orders/:orderId
+ * Get order details
+ */
+router.get('/:orderId', async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+
+    const result = await callService('GET', `/orders/${orderId}`, null, getProxyHeaders(req));
+
+    if (!result.success) {
+      return res.status(result.status).json(result.data);
+    }
+
+    res.json({
+      success: true,
+      data: result.data
+    });
+
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/orders/:orderId/cancel
+ * Cancel or fail an order for the current user/admin
+ */
+router.post('/:orderId/cancel', async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const result = await callService('POST', `/orders/${orderId}/cancel`, req.body, getProxyHeaders(req));
+
+    if (!result.success) {
+      return res.status(result.status).json(result.data);
+    }
+
+    res.json({
+      success: true,
+      data: result.data,
+      message: result.data?.message || 'Order cancelled successfully'
+    });
   } catch (error) {
     next(error);
   }
