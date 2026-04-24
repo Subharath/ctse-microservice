@@ -26,6 +26,7 @@ jobs:
           - order-service
           - payment-service
           - cart-service
+          - frontend
 
     steps:
       - name: Checkout
