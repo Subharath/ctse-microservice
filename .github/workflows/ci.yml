@@ -23,6 +23,7 @@ jobs:
           - order-service
           - payment-service
           - cart-service
+          - frontend
 
     steps:
       - name: Checkout
@@ -42,7 +43,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          find src -type f -name "*.js" -print0 | xargs -0 -I{} node -c "{}"
+          if [ -d src ]; then
+            find src -type f -name "*.js" -print0 | xargs -0 -I{} node -c "{}"
+          fi
 
   docker-compose-validate:
     name: Docker Compose Validate
@@ -79,6 +82,9 @@ jobs:
           - service: cart-service
             context: ./cart-service
             dockerfile: ./cart-service/Dockerfile
+          - service: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
 
     steps:
       - name: Checkout
