@@ -8,8 +8,9 @@ const logger = require('../utils/logger');
 
 const authMiddleware = (req, res, next) => {
   try {
-    // Skip authentication for health check
-    if (req.path === '/health') {
+    // Skip authentication for public routes like health checks and Swagger docs
+    const skipPaths = ['/health', '/docs', '/docs.json'];
+    if (skipPaths.some(path => req.path.startsWith(path))) {
       return next();
     }
 

@@ -1,6 +1,7 @@
 const express = require('express')
 const cors = require('cors')
 const morgan = require('morgan')
+const swaggerUi = require('swagger-ui-express')
 require('dotenv').config()
 
 const authMiddleware = require('./middleware/auth')
@@ -8,6 +9,7 @@ const contextInjector = require('./middleware/contextInjector')
 const errorHandler = require('./middleware/errorHandler')
 const requestLogger = require('./middleware/requestLogger')
 const rateLimiter = require('./middleware/rateLimiter')
+const swaggerSpec = require('./utils/swagger')
 
 const authRoutes = require('./routes/auth')
 const userRoutes = require('./routes/users')
@@ -50,6 +52,14 @@ app.use(requestLogger)
 app.use(rateLimiter)
 
 app.use('/health', healthRoutes)
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  customSiteTitle: 'CTSE API Gateway Docs',
+}))
+app.get('/docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json')
+  res.send(swaggerSpec)
+})
 app.use('/api/auth', authRoutes)
 
 app.use(authMiddleware)
