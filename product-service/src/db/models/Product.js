@@ -92,12 +92,24 @@ const getProductById = async (productId) => {
   return await collection.findOne({ productId });
 };
 
-const getProducts = async (page = 1, limit = 10, category = null) => {
+const getProducts = async (page = 1, limit = 10, category = null, search = null) => {
   const db = getDb();
   const collection = db.collection(COLLECTION);
 
   const skip = (page - 1) * limit;
-  const query = category ? { category } : {};
+  const query = {};
+
+  if (category) {
+    query.category = category;
+  }
+
+  if (search && search.trim()) {
+    const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.$or = [
+      { name: { $regex: escaped, $options: 'i' } },
+      { description: { $regex: escaped, $options: 'i' } }
+    ];
+  }
 
   const [products, total] = await Promise.all([
     collection.find(query).skip(skip).limit(limit).toArray(),
