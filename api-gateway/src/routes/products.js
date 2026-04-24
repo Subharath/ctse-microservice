@@ -125,8 +125,8 @@ router.put('/:productId/stock', async (req, res, next) => {
     const { productId } = req.params;
     const { quantity, operation } = req.body;
 
-    // Validate authorization - only admins and service-to-service
-    if (req.user.role !== 'admin' && !req.headers['x-service-auth']) {
+    // Validate authorization - stock changes are gateway-admin only.
+    if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update product stock',
