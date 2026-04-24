@@ -381,7 +381,6 @@ Resources:
             awslogs-stream-prefix: ecs
   UserServiceService:
     Type: AWS::ECS::Service
-    DependsOn: []
     Properties:
       Cluster:
         Ref: ECSCluster
@@ -465,7 +464,6 @@ Resources:
             awslogs-stream-prefix: ecs
   ProductServiceService:
     Type: AWS::ECS::Service
-    DependsOn: []
     Properties:
       Cluster:
         Ref: ECSCluster
@@ -553,7 +551,6 @@ Resources:
             awslogs-stream-prefix: ecs
   OrderServiceService:
     Type: AWS::ECS::Service
-    DependsOn: []
     Properties:
       Cluster:
         Ref: ECSCluster
@@ -639,7 +636,6 @@ Resources:
             awslogs-stream-prefix: ecs
   PaymentServiceService:
     Type: AWS::ECS::Service
-    DependsOn: []
     Properties:
       Cluster:
         Ref: ECSCluster
@@ -725,7 +721,6 @@ Resources:
             awslogs-stream-prefix: ecs
   CartServiceService:
     Type: AWS::ECS::Service
-    DependsOn: []
     Properties:
       Cluster:
         Ref: ECSCluster
