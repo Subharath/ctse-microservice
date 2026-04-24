@@ -56,6 +56,9 @@ jobs:
           - service: cart-service
             context: ./cart-service
             dockerfile: ./cart-service/Dockerfile
+          - service: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
 
     steps:
       - name: Checkout
