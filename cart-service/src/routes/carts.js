@@ -15,6 +15,7 @@ const { getContext } = require('../utils/context');
 const CartModel = require('../db/models/Cart');
 
 const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || 'internal-local-secret';
 
 const callProductService = async (req, method, path) => {
   try {
@@ -26,7 +27,9 @@ const callProductService = async (req, method, path) => {
         'Content-Type': 'application/json',
         'X-User-ID': req.headers['x-user-id'],
         'X-User-Role': req.headers['x-user-role'],
-        'X-Request-ID': req.headers['x-request-id']
+        'X-Request-ID': req.headers['x-request-id'],
+        'X-Internal-Service-Name': 'cart-service',
+        'X-Internal-Service-Secret': INTERNAL_SERVICE_SECRET
       }
     });
     return { success: true, data: response.data, status: response.status };
