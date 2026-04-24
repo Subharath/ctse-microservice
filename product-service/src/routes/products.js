@@ -18,10 +18,10 @@ const ProductModel = require('../db/models/Product');
  */
 router.get('/', async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, category } = req.query;
+    const { page = 1, limit = 10, category, search } = req.query;
     const context = getContext(req);
 
-    const result = await ProductModel.getProducts(parseInt(page), parseInt(limit), category);
+    const result = await ProductModel.getProducts(parseInt(page, 10), parseInt(limit, 10), category, search);
 
     logger.debug('Products listed', { page, limit, userId: context.userId, requestId: context.requestId });
 
@@ -103,7 +103,7 @@ router.put('/:productId/stock', async (req, res, next) => {
     const { quantity, operation } = req.body;
     const context = getContext(req);
 
-    const isInternalService = req.headers['x-service-auth'] === 'order-service';
+    const isInternalService = req.serviceAuth?.name === 'order-service';
     if (context.userRole !== 'admin' && !isInternalService) {
       return res.status(403).json({
         success: false,
