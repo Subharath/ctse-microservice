@@ -19,6 +19,7 @@ const callService = async (method, path, data = null, headers = {}) => {
       timeout: 5000,
       headers: {
         'Content-Type': 'application/json',
+        'x-gateway-auth': process.env.GATEWAY_SHARED_SECRET || 'gateway-local-secret',
         ...headers
       }
     };
