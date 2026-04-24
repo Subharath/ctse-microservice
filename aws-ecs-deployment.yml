@@ -1,0 +1,861 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS ECS Fargate deployment for CTSE Microservices
+Parameters:
+  DockerHubUsername:
+    Type: String
+    Description: Your DockerHub Username
+  ImageTag:
+    Type: String
+    Default: latest
+  MongoDbUri:
+    Type: String
+    NoEcho: true
+  JwtSecret:
+    Type: String
+    NoEcho: true
+  JwtRefreshSecret:
+    Type: String
+    NoEcho: true
+  GatewaySharedSecret:
+    Type: String
+    NoEcho: true
+  InternalServiceSecret:
+    Type: String
+    NoEcho: true
+  CorsOrigin:
+    Type: String
+    Default: '*'
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: CTSE-VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: CTSE-IGW
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: CTSE-PublicRouteTable
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Name
+        Value: CTSE-PublicSubnet1
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Name
+        Value: CTSE-PublicSubnet2
+  Subnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PublicSubnet1
+      RouteTableId:
+        Ref: PublicRouteTable
+  Subnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PublicSubnet2
+      RouteTableId:
+        Ref: PublicRouteTable
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: CTSE-Cluster
+  CloudMapNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: ctse.local
+      Vpc:
+        Ref: VPC
+  SecurityGroupALB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP to ALB
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 8000
+        ToPort: 8000
+        CidrIp: 0.0.0.0/0
+  SecurityGroupECS:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow traffic from ALB and internal
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: '-1'
+        SourceSecurityGroupId:
+          Ref: SecurityGroupALB
+  SecurityGroupECSSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: SecurityGroupECS
+      IpProtocol: '-1'
+      SourceSecurityGroupId:
+        Ref: SecurityGroupECS
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: CTSE-ALB
+      Subnets:
+      - Ref: PublicSubnet1
+      - Ref: PublicSubnet2
+      SecurityGroups:
+      - Ref: SecurityGroupALB
+      Scheme: internet-facing
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+  ApiGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/ctse/api-gateway
+      RetentionInDays: 7
+  ApiGatewayDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: api-gateway
+      DnsConfig:
+        NamespaceId:
+          Ref: CloudMapNamespace
+        DnsRecords:
+        - Type: A
+          TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  ApiGatewayTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ctse-api-gateway
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn:
+        Ref: TaskExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name: api-gateway
+        Image:
+          Fn::Sub: ${DockerHubUsername}/ctse-api-gateway:${ImageTag}
+        PortMappings:
+        - ContainerPort: 8000
+        Environment:
+        - Name: NODE_ENV
+          Value: production
+        - Name: PORT
+          Value: '8000'
+        - Name: NODE_OPTIONS
+          Value: --max-old-space-size=256
+        - Name: JWT_SECRET
+          Value:
+            Ref: JwtSecret
+        - Name: JWT_REFRESH_SECRET
+          Value:
+            Ref: JwtRefreshSecret
+        - Name: GATEWAY_SHARED_SECRET
+          Value:
+            Ref: GatewaySharedSecret
+        - Name: CORS_ORIGIN
+          Value:
+            Ref: CorsOrigin
+        - Name: USER_SERVICE_URL
+          Value: http://user-service.ctse.local:3001
+        - Name: PRODUCT_SERVICE_URL
+          Value: http://product-service.ctse.local:3002
+        - Name: ORDER_SERVICE_URL
+          Value: http://order-service.ctse.local:3003
+        - Name: PAYMENT_SERVICE_URL
+          Value: http://payment-service.ctse.local:3004
+        - Name: CART_SERVICE_URL
+          Value: http://cart-service.ctse.local:3005
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group:
+              Ref: ApiGatewayLogGroup
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-stream-prefix: ecs
+  ApiGatewayTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: CTSE-ApiGateway-TG
+      VpcId:
+        Ref: VPC
+      Port: 8000
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+  ApiGatewayListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn:
+        Ref: ALB
+      Port: 8000
+      Protocol: HTTP
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: ApiGatewayTargetGroup
+  ApiGatewayService:
+    Type: AWS::ECS::Service
+    DependsOn:
+    - ApiGatewayListener
+    Properties:
+      Cluster:
+        Ref: ECSCluster
+      TaskDefinition:
+        Ref: ApiGatewayTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: PublicSubnet1
+          - Ref: PublicSubnet2
+          SecurityGroups:
+          - Ref: SecurityGroupECS
+      ServiceRegistries:
+      - RegistryArn:
+          Fn::GetAtt:
+          - ApiGatewayDiscoveryService
+          - Arn
+      LoadBalancers:
+      - ContainerName: api-gateway
+        ContainerPort: 8000
+        TargetGroupArn:
+          Ref: ApiGatewayTargetGroup
+      DependsOn:
+      - ApiGatewayListener
+  UserServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/ctse/user-service
+      RetentionInDays: 7
+  UserServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: user-service
+      DnsConfig:
+        NamespaceId:
+          Ref: CloudMapNamespace
+        DnsRecords:
+        - Type: A
+          TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  UserServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ctse-user-service
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn:
+        Ref: TaskExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name: user-service
+        Image:
+          Fn::Sub: ${DockerHubUsername}/ctse-user-service:${ImageTag}
+        PortMappings:
+        - ContainerPort: 3001
+        Environment:
+        - Name: NODE_ENV
+          Value: production
+        - Name: PORT
+          Value: '3001'
+        - Name: NODE_OPTIONS
+          Value: --max-old-space-size=256
+        - Name: MONGODB_URI
+          Value:
+            Ref: MongoDbUri
+        - Name: JWT_SECRET
+          Value:
+            Ref: JwtSecret
+        - Name: JWT_REFRESH_SECRET
+          Value:
+            Ref: JwtRefreshSecret
+        - Name: GATEWAY_SHARED_SECRET
+          Value:
+            Ref: GatewaySharedSecret
+        - Name: INTERNAL_SERVICE_SECRET
+          Value:
+            Ref: InternalServiceSecret
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group:
+              Ref: UserServiceLogGroup
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-stream-prefix: ecs
+  UserServiceService:
+    Type: AWS::ECS::Service
+    DependsOn: []
+    Properties:
+      Cluster:
+        Ref: ECSCluster
+      TaskDefinition:
+        Ref: UserServiceTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: PublicSubnet1
+          - Ref: PublicSubnet2
+          SecurityGroups:
+          - Ref: SecurityGroupECS
+      ServiceRegistries:
+      - RegistryArn:
+          Fn::GetAtt:
+          - UserServiceDiscoveryService
+          - Arn
+  ProductServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/ctse/product-service
+      RetentionInDays: 7
+  ProductServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: product-service
+      DnsConfig:
+        NamespaceId:
+          Ref: CloudMapNamespace
+        DnsRecords:
+        - Type: A
+          TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  ProductServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ctse-product-service
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn:
+        Ref: TaskExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name: product-service
+        Image:
+          Fn::Sub: ${DockerHubUsername}/ctse-product-service:${ImageTag}
+        PortMappings:
+        - ContainerPort: 3002
+        Environment:
+        - Name: NODE_ENV
+          Value: production
+        - Name: PORT
+          Value: '3002'
+        - Name: NODE_OPTIONS
+          Value: --max-old-space-size=256
+        - Name: MONGODB_URI
+          Value:
+            Ref: MongoDbUri
+        - Name: GATEWAY_SHARED_SECRET
+          Value:
+            Ref: GatewaySharedSecret
+        - Name: INTERNAL_SERVICE_SECRET
+          Value:
+            Ref: InternalServiceSecret
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group:
+              Ref: ProductServiceLogGroup
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-stream-prefix: ecs
+  ProductServiceService:
+    Type: AWS::ECS::Service
+    DependsOn: []
+    Properties:
+      Cluster:
+        Ref: ECSCluster
+      TaskDefinition:
+        Ref: ProductServiceTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: PublicSubnet1
+          - Ref: PublicSubnet2
+          SecurityGroups:
+          - Ref: SecurityGroupECS
+      ServiceRegistries:
+      - RegistryArn:
+          Fn::GetAtt:
+          - ProductServiceDiscoveryService
+          - Arn
+  OrderServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/ctse/order-service
+      RetentionInDays: 7
+  OrderServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: order-service
+      DnsConfig:
+        NamespaceId:
+          Ref: CloudMapNamespace
+        DnsRecords:
+        - Type: A
+          TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  OrderServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ctse-order-service
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn:
+        Ref: TaskExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name: order-service
+        Image:
+          Fn::Sub: ${DockerHubUsername}/ctse-order-service:${ImageTag}
+        PortMappings:
+        - ContainerPort: 3003
+        Environment:
+        - Name: NODE_ENV
+          Value: production
+        - Name: PORT
+          Value: '3003'
+        - Name: NODE_OPTIONS
+          Value: --max-old-space-size=256
+        - Name: MONGODB_URI
+          Value:
+            Ref: MongoDbUri
+        - Name: PRODUCT_SERVICE_URL
+          Value: http://product-service.ctse.local:3002
+        - Name: USER_SERVICE_URL
+          Value: http://user-service.ctse.local:3001
+        - Name: GATEWAY_SHARED_SECRET
+          Value:
+            Ref: GatewaySharedSecret
+        - Name: INTERNAL_SERVICE_SECRET
+          Value:
+            Ref: InternalServiceSecret
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group:
+              Ref: OrderServiceLogGroup
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-stream-prefix: ecs
+  OrderServiceService:
+    Type: AWS::ECS::Service
+    DependsOn: []
+    Properties:
+      Cluster:
+        Ref: ECSCluster
+      TaskDefinition:
+        Ref: OrderServiceTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: PublicSubnet1
+          - Ref: PublicSubnet2
+          SecurityGroups:
+          - Ref: SecurityGroupECS
+      ServiceRegistries:
+      - RegistryArn:
+          Fn::GetAtt:
+          - OrderServiceDiscoveryService
+          - Arn
+  PaymentServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/ctse/payment-service
+      RetentionInDays: 7
+  PaymentServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: payment-service
+      DnsConfig:
+        NamespaceId:
+          Ref: CloudMapNamespace
+        DnsRecords:
+        - Type: A
+          TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  PaymentServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ctse-payment-service
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn:
+        Ref: TaskExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name: payment-service
+        Image:
+          Fn::Sub: ${DockerHubUsername}/ctse-payment-service:${ImageTag}
+        PortMappings:
+        - ContainerPort: 3004
+        Environment:
+        - Name: NODE_ENV
+          Value: production
+        - Name: PORT
+          Value: '3004'
+        - Name: NODE_OPTIONS
+          Value: --max-old-space-size=256
+        - Name: MONGODB_URI
+          Value:
+            Ref: MongoDbUri
+        - Name: ORDER_SERVICE_URL
+          Value: http://order-service.ctse.local:3003
+        - Name: GATEWAY_SHARED_SECRET
+          Value:
+            Ref: GatewaySharedSecret
+        - Name: INTERNAL_SERVICE_SECRET
+          Value:
+            Ref: InternalServiceSecret
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group:
+              Ref: PaymentServiceLogGroup
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-stream-prefix: ecs
+  PaymentServiceService:
+    Type: AWS::ECS::Service
+    DependsOn: []
+    Properties:
+      Cluster:
+        Ref: ECSCluster
+      TaskDefinition:
+        Ref: PaymentServiceTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: PublicSubnet1
+          - Ref: PublicSubnet2
+          SecurityGroups:
+          - Ref: SecurityGroupECS
+      ServiceRegistries:
+      - RegistryArn:
+          Fn::GetAtt:
+          - PaymentServiceDiscoveryService
+          - Arn
+  CartServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/ctse/cart-service
+      RetentionInDays: 7
+  CartServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: cart-service
+      DnsConfig:
+        NamespaceId:
+          Ref: CloudMapNamespace
+        DnsRecords:
+        - Type: A
+          TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  CartServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ctse-cart-service
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn:
+        Ref: TaskExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name: cart-service
+        Image:
+          Fn::Sub: ${DockerHubUsername}/ctse-cart-service:${ImageTag}
+        PortMappings:
+        - ContainerPort: 3005
+        Environment:
+        - Name: NODE_ENV
+          Value: production
+        - Name: PORT
+          Value: '3005'
+        - Name: NODE_OPTIONS
+          Value: --max-old-space-size=256
+        - Name: MONGODB_URI
+          Value:
+            Ref: MongoDbUri
+        - Name: PRODUCT_SERVICE_URL
+          Value: http://product-service.ctse.local:3002
+        - Name: GATEWAY_SHARED_SECRET
+          Value:
+            Ref: GatewaySharedSecret
+        - Name: INTERNAL_SERVICE_SECRET
+          Value:
+            Ref: InternalServiceSecret
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group:
+              Ref: CartServiceLogGroup
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-stream-prefix: ecs
+  CartServiceService:
+    Type: AWS::ECS::Service
+    DependsOn: []
+    Properties:
+      Cluster:
+        Ref: ECSCluster
+      TaskDefinition:
+        Ref: CartServiceTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: PublicSubnet1
+          - Ref: PublicSubnet2
+          SecurityGroups:
+          - Ref: SecurityGroupECS
+      ServiceRegistries:
+      - RegistryArn:
+          Fn::GetAtt:
+          - CartServiceDiscoveryService
+          - Arn
+  FrontendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/ctse/frontend
+      RetentionInDays: 7
+  FrontendDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: frontend
+      DnsConfig:
+        NamespaceId:
+          Ref: CloudMapNamespace
+        DnsRecords:
+        - Type: A
+          TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  FrontendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ctse-frontend
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn:
+        Ref: TaskExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name: frontend
+        Image:
+          Fn::Sub: ${DockerHubUsername}/ctse-frontend:${ImageTag}
+        PortMappings:
+        - ContainerPort: 80
+        Environment:
+        - Name: API_GATEWAY_UPSTREAM
+          Value: api-gateway.ctse.local:8000
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group:
+              Ref: FrontendLogGroup
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-stream-prefix: ecs
+  FrontendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: CTSE-Frontend-TG
+      VpcId:
+        Ref: VPC
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+  FrontendListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn:
+        Ref: ALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: FrontendTargetGroup
+  FrontendService:
+    Type: AWS::ECS::Service
+    DependsOn:
+    - FrontendListener
+    Properties:
+      Cluster:
+        Ref: ECSCluster
+      TaskDefinition:
+        Ref: FrontendTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: PublicSubnet1
+          - Ref: PublicSubnet2
+          SecurityGroups:
+          - Ref: SecurityGroupECS
+      ServiceRegistries:
+      - RegistryArn:
+          Fn::GetAtt:
+          - FrontendDiscoveryService
+          - Arn
+      LoadBalancers:
+      - ContainerName: frontend
+        ContainerPort: 80
+        TargetGroupArn:
+          Ref: FrontendTargetGroup
+      DependsOn:
+      - FrontendListener
+Outputs:
+  FrontendURL:
+    Description: URL of the Frontend app
+    Value:
+      Fn::Sub: http://${ALB.DNSName}
+  ApiGatewayURL:
+    Description: URL of the API Gateway
+    Value:
+      Fn::Sub: http://${ALB.DNSName}:8000
