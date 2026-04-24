@@ -1,6 +1,7 @@
 const getProxyHeaders = (req, extra = {}) => {
   const headers = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'X-Gateway-Auth': process.env.GATEWAY_SHARED_SECRET || 'gateway-local-secret'
   };
 
   if (req.headers.authorization) {
