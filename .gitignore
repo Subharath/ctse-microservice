@@ -124,6 +124,11 @@ ENV/
 # SonarCloud
 .scannerwork/
 
+# Project docs folders
+ARCHITECTURE/
+Architecture/
+Instructions/
+
 # Temporary
 *.bak
 *.backup
