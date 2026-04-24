@@ -46,7 +46,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      MONGODB_URI: ${USER_MONGODB_URI}
+      MONGODB_URI: ${MONGODB_URI}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-refresh-secret-change-in-production}
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-gateway-local-secret}
@@ -71,7 +71,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
-      MONGODB_URI: ${PRODUCT_MONGODB_URI}
+      MONGODB_URI: ${MONGODB_URI}
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-gateway-local-secret}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-internal-local-secret}
     networks:
@@ -94,7 +94,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3003
-      MONGODB_URI: ${ORDER_MONGODB_URI}
+      MONGODB_URI: ${MONGODB_URI}
       PRODUCT_SERVICE_URL: http://product-service:3002
       USER_SERVICE_URL: http://user-service:3001
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-gateway-local-secret}
@@ -124,7 +124,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3004
-      MONGODB_URI: ${PAYMENT_MONGODB_URI}
+      MONGODB_URI: ${MONGODB_URI}
       ORDER_SERVICE_URL: http://order-service:3003
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-gateway-local-secret}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-internal-local-secret}
@@ -148,7 +148,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3005
-      MONGODB_URI: ${CART_MONGODB_URI}
+      MONGODB_URI: ${MONGODB_URI}
       PRODUCT_SERVICE_URL: http://product-service:3002
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-gateway-local-secret}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-internal-local-secret}
