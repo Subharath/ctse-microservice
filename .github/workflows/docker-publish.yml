@@ -114,11 +114,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Force redeploy all ECS services
+      - name: Discover and redeploy all ECS services
         run: |
           CLUSTER=CTSE-Cluster
-          SERVICES=(ApiGatewayService UserServiceService ProductServiceService OrderServiceService PaymentServiceService CartServiceService FrontendService)
-          for svc in "${SERVICES[@]}"; do
+          echo "Services in cluster:"
+          aws ecs list-services --cluster $CLUSTER --output text
+          aws ecs list-services --cluster $CLUSTER --query 'serviceArns[]' --output text | tr '\t' '\n' | while read arn; do
+            svc=$(basename $arn)
             echo "Redeploying $svc..."
             aws ecs update-service --cluster $CLUSTER --service $svc --force-new-deployment
           done
