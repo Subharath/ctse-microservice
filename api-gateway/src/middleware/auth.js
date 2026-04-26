@@ -2,7 +2,7 @@
  * JWT Authentication Middleware
  * Validates JWT tokens and attaches user info to request
  */
-
+//test comment
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 
